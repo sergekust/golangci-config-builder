@@ -2,37 +2,36 @@ import type { QuestionDefinition } from './types'
 
 export const ignoredErrorsQuestion = {
   id: 'ignored-errors',
-  group: 'Errors',
+  topic: 'Errors',
   position: 1,
-  total: 8,
   policyKey: 'ignoredErrors',
-  prompt: 'Should ignored errors be reported?',
-  explanation:
-    'A returned error can carry the only signal that cleanup or persistence failed. Choose how consistently your team wants that signal checked.',
-  code: {
-    language: 'go',
-    filename: 'save.go',
-    source: `func save(file *os.File) error {
-    file.Close()
-    return nil
-}`,
-  },
+  title: 'Should ignored errors be reported?',
+  comment:
+    'A returned error can carry the only signal that cleanup or persistence failed. Choose whether such errors must be handled explicitly.',
   options: [
     {
-      value: 'practical',
-      label: 'Practical',
-      description: 'Catch ignored errors in meaningful situations.',
+      id: 'report',
+      value: 'report',
+      label: 'Report ignored errors',
+      description: 'Require returned errors to be handled explicitly.',
+      code: `func save(file *os.File) error {
+    if err := file.Close(); err != nil {
+        return err
+    }
+
+    return nil
+}`,
       recommended: true,
     },
     {
-      value: 'strict',
-      label: 'Strict',
-      description: 'Report all unchecked errors where possible.',
-    },
-    {
-      value: 'off',
-      label: 'Off',
-      description: 'Do not enforce ignored-error checking.',
+      id: 'allow',
+      value: 'allow',
+      label: 'Allow ignored errors',
+      description: 'Allow returned errors to be ignored.',
+      code: `func save(file *os.File) error {
+    file.Close()
+    return nil
+}`,
     },
   ],
 } satisfies QuestionDefinition<'ignoredErrors'>

@@ -1,11 +1,13 @@
-import type { Policy } from '../policy/types'
+import type { Policy, PolicyValue } from '../policy/types'
 import type { QuestionDefinition } from '../questions/types'
-import type { KeyboardEvent } from 'react'
+import type { FocusEvent, KeyboardEvent } from 'react'
 
 type ChoiceGroupProps<K extends keyof Policy> = {
   question: QuestionDefinition<K>
   value: Policy[K]
-  onChange: (value: Policy[K]) => void
+  onChange: (value: PolicyValue<K>) => void
+  onPreview: (optionId: string) => void
+  onPreviewEnd: () => void
 }
 
 function CheckIcon() {
@@ -20,6 +22,8 @@ export function ChoiceGroup<K extends keyof Policy>({
   question,
   value,
   onChange,
+  onPreview,
+  onPreviewEnd,
 }: ChoiceGroupProps<K>) {
   const handleArrowNavigation = (
     event: KeyboardEvent<HTMLInputElement>,
@@ -45,30 +49,40 @@ export function ChoiceGroup<K extends keyof Policy>({
     onChange(question.options[nextIndex].value)
   }
 
+  const handlePreviewBlur = (event: FocusEvent<HTMLFieldSetElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      onPreviewEnd()
+    }
+  }
+
   return (
     <fieldset
       className="choice-group"
       aria-describedby={`${question.id}-explanation`}
+      onBlur={handlePreviewBlur}
+      onMouseLeave={onPreviewEnd}
     >
-      <legend className="sr-only">{question.prompt}</legend>
+      <legend className="sr-only">{question.title}</legend>
       {question.options.map((option, index) => {
         const isSelected = option.value === value
-        const inputId = `${question.id}-${String(option.value)}`
+        const inputId = `${question.id}-${option.id}`
 
         return (
           <label
             className={`choice ${isSelected ? 'choice--selected' : ''}`}
             htmlFor={inputId}
-            key={String(option.value)}
+            key={option.id}
+            onMouseEnter={() => onPreview(option.id)}
           >
             <input
               checked={isSelected}
               id={inputId}
               name={question.id}
               onChange={() => onChange(option.value)}
+              onFocus={() => onPreview(option.id)}
               onKeyDown={(event) => handleArrowNavigation(event, index)}
               type="radio"
-              value={String(option.value)}
+              value={option.id}
             />
             <span className="choice__surface">
               <span className="choice__marker" aria-hidden="true">

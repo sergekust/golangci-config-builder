@@ -1,9 +1,9 @@
-import type { Policy } from './types'
+import type { Policy, PolicyValue } from './types'
 
 export function updatePolicy<K extends keyof Policy>(
   policy: Policy,
   key: K,
-  value: Policy[K],
+  value: PolicyValue<K>,
 ): Policy {
   return {
     ...policy,

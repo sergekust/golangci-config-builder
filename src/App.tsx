@@ -1,91 +1,159 @@
 import { useState } from 'react'
 import { ConfigPreview } from './components/ConfigPreview'
 import { DecisionPane } from './components/DecisionPane'
+import { SuccessPane } from './components/SuccessPane'
 import { deriveGolangciConfig } from './config/deriveConfig'
-import { findChangedLineNumbers } from './config/findChangedLines'
-import { renderYaml } from './config/renderYaml'
-import { DEFAULT_POLICY } from './policy/defaults'
-import type { IgnoredErrorsPolicy, Policy } from './policy/types'
+import {
+  createPreviewYamlLines,
+  findChangedLines,
+  hasYamlChanges,
+  type PreviewYamlLine,
+} from './config/findChangedLines'
+import { renderYamlDocument } from './config/renderYaml'
+import { GOLANGCI_LINT_VERSION } from './config/targetVersion'
+import { validateYaml } from './config/validateYaml'
+import { EMPTY_POLICY } from './policy/defaults'
+import type { Policy, PolicyValue } from './policy/types'
 import { updatePolicy } from './policy/updatePolicy'
-import { ignoredErrorsQuestion } from './questions/ignoredErrors'
+import { QUESTIONS, QUESTION_TOTAL } from './questions/catalog'
+import type { QuestionDefinition } from './questions/types'
 import './App.css'
 
+const EMPTY_DOCUMENT = renderYamlDocument(deriveGolangciConfig(EMPTY_POLICY))
+
+function countAnsweredQuestions(policy: Policy): number {
+  return QUESTIONS.filter(
+    (question) => policy[question.policyKey] !== undefined,
+  ).length
+}
+
+function decisionLabel(count: number): string {
+  return count === 1 ? 'decision' : 'decisions'
+}
+
 function App() {
-  const [policy, setPolicy] = useState<Policy>(DEFAULT_POLICY)
-  const [yamlRevision, setYamlRevision] = useState(0)
-  const [changedYamlLines, setChangedYamlLines] = useState<readonly number[]>([])
+  const [policy, setPolicy] = useState<Policy>(EMPTY_POLICY)
+  const [questionIndex, setQuestionIndex] = useState(0)
+  const [isComplete, setIsComplete] = useState(false)
+  const [previewLines, setPreviewLines] = useState<
+    readonly PreviewYamlLine[]
+  >(() => createPreviewYamlLines(EMPTY_DOCUMENT.lines))
+  const [changeRevision, setChangeRevision] = useState(0)
   const [announcement, setAnnouncement] = useState('')
-  const [isConfirmed, setIsConfirmed] = useState(false)
+
+  const currentQuestion = QUESTIONS[questionIndex]
   const config = deriveGolangciConfig(policy)
-  const yaml = renderYaml(config)
-  const configStatus =
-    policy.ignoredErrors === 'strict'
-      ? 'Strict policy · errcheck enabled'
-      : policy.ignoredErrors === 'off'
-        ? 'Ignored errors off · errcheck not enabled'
-        : 'Practical policy · errcheck enabled'
+  const document = renderYamlDocument(config)
+  const validation = validateYaml(document.text)
+  const answeredCount = countAnsweredQuestions(policy)
+  const enabledCount = config.linters.enable?.length ?? 0
+  const enabledLabel = enabledCount === 1 ? 'linter' : 'linters'
+  const configStatus = `${enabledCount} ${enabledLabel} enabled · ${answeredCount} of ${QUESTION_TOTAL} ${decisionLabel(QUESTION_TOTAL)}`
 
-  const trackYamlChange = (nextYaml: string) => {
-    const changedLines = findChangedLineNumbers(yaml, nextYaml)
-    setChangedYamlLines(changedLines)
+  const showDocumentChanges = (
+    previousPolicy: Policy,
+    nextPolicy: Policy,
+  ) => {
+    const previousDocument = renderYamlDocument(
+      deriveGolangciConfig(previousPolicy),
+    )
+    const nextDocument = renderYamlDocument(deriveGolangciConfig(nextPolicy))
+    const nextPreviewLines = findChangedLines(
+      previousDocument.lines,
+      nextDocument.lines,
+    )
 
-    if (changedLines.length > 0) {
-      setYamlRevision((revision) => revision + 1)
+    setPreviewLines(nextPreviewLines)
+    if (hasYamlChanges(nextPreviewLines)) {
+      setChangeRevision((revision) => revision + 1)
     }
   }
 
-  const selectIgnoredErrors = (value: IgnoredErrorsPolicy) => {
-    const nextPolicy = updatePolicy(
-      policy,
-      ignoredErrorsQuestion.policyKey,
-      value,
-    )
-    const nextYaml = renderYaml(deriveGolangciConfig(nextPolicy))
+  const clearDocumentChanges = (nextPolicy: Policy = policy) => {
+    const nextDocument = renderYamlDocument(deriveGolangciConfig(nextPolicy))
+    setPreviewLines(createPreviewYamlLines(nextDocument.lines))
+  }
 
-    trackYamlChange(nextYaml)
-    setPolicy(nextPolicy)
-    setIsConfirmed(false)
-
-    const result =
-      value === 'off' ? 'errcheck is not enabled.' : 'errcheck enabled.'
-    const selectedLabel = ignoredErrorsQuestion.options.find(
+  const selectAnswer = <K extends keyof Policy>(
+    question: QuestionDefinition<K>,
+    value: PolicyValue<K>,
+  ) => {
+    const nextPolicy = updatePolicy(policy, question.policyKey, value)
+    const selectedLabel = question.options.find(
       (option) => option.value === value,
-    )?.label ?? value
-    setAnnouncement(`Ignored-error policy set to ${selectedLabel}. ${result}`)
+    )?.label
+
+    showDocumentChanges(policy, nextPolicy)
+    setPolicy(nextPolicy)
+    setAnnouncement(
+      selectedLabel
+        ? `${question.title}: ${selectedLabel}.`
+        : `${question.title}: answer selected.`,
+    )
+  }
+
+  const continueFlow = () => {
+    clearDocumentChanges()
+
+    if (questionIndex === QUESTION_TOTAL - 1) {
+      setIsComplete(true)
+      setAnnouncement('Configuration complete.')
+      return
+    }
+
+    setQuestionIndex((index) => index + 1)
+  }
+
+  const goBack = () => {
+    clearDocumentChanges()
+    setQuestionIndex((index) => Math.max(0, index - 1))
+  }
+
+  const returnFromSuccess = () => {
+    clearDocumentChanges()
+    setIsComplete(false)
+    setQuestionIndex(Math.max(0, QUESTION_TOTAL - 1))
+    setAnnouncement('Returned to the last question.')
   }
 
   const resetPolicy = () => {
-    const defaultYaml = renderYaml(deriveGolangciConfig(DEFAULT_POLICY))
-
-    trackYamlChange(defaultYaml)
-    setPolicy(DEFAULT_POLICY)
-    setIsConfirmed(false)
-    setAnnouncement('Policy reset to the recommended practical choice.')
-  }
-
-  const confirmDecision = () => {
-    const selectedLabel = ignoredErrorsQuestion.options.find(
-      (option) => option.value === policy.ignoredErrors,
-    )?.label ?? policy.ignoredErrors
-    setIsConfirmed(true)
-    setAnnouncement(`${selectedLabel} ignored-error policy confirmed.`)
+    setPolicy(EMPTY_POLICY)
+    setQuestionIndex(0)
+    setIsComplete(false)
+    setPreviewLines(createPreviewYamlLines(EMPTY_DOCUMENT.lines))
+    setChangeRevision((revision) => revision + 1)
+    setAnnouncement('All decisions cleared.')
   }
 
   return (
     <main className="app-shell">
-      <DecisionPane
-        onChange={selectIgnoredErrors}
-        onContinue={confirmDecision}
-        question={ignoredErrorsQuestion}
-        value={policy.ignoredErrors}
-        isConfirmed={isConfirmed}
-      />
+      {isComplete ? (
+        <SuccessPane
+          decisionCount={answeredCount}
+          onBack={returnFromSuccess}
+          targetVersion={GOLANGCI_LINT_VERSION}
+        />
+      ) : (
+        <DecisionPane
+          canGoBack={questionIndex > 0}
+          key={currentQuestion.id}
+          onBack={goBack}
+          onChange={(value) => selectAnswer(currentQuestion, value)}
+          onContinue={continueFlow}
+          question={currentQuestion}
+          total={QUESTION_TOTAL}
+          value={policy[currentQuestion.policyKey]}
+        />
+      )}
       <ConfigPreview
-        changedLineNumbers={changedYamlLines}
+        changeRevision={changeRevision}
+        isValid={validation.valid}
+        lines={previewLines}
         onReset={resetPolicy}
         status={configStatus}
-        yaml={yaml}
-        yamlRevision={yamlRevision}
+        targetVersion={GOLANGCI_LINT_VERSION}
+        validationErrors={validation.errors}
+        yaml={document.text}
       />
       <p
         className="sr-only"

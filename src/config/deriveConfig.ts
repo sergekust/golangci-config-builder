@@ -1,32 +1,41 @@
 import type { Policy } from '../policy/types'
-import type { GolangciConfigV2, GolangciLinterRule } from './types'
+import type { GolangciConfigV2 } from './types'
 
-type RuleContributor = (policy: Policy) => readonly GolangciLinterRule[]
+type LinterContributor = (policy: Policy) => readonly string[]
 
-const ignoredErrorsRules: RuleContributor = (policy) => {
-  if (policy.ignoredErrors === 'off') {
-    return []
-  }
+const ignoredErrorsLinters: LinterContributor = (policy) =>
+  policy.ignoredErrors === 'report' ? ['errcheck'] : []
 
-  return [{ name: 'errcheck' }]
+const arangoDbLinters: LinterContributor = (policy) =>
+  policy.arangoDbUsage === 'use' ? ['arangolint'] : []
+
+const linterContributors: readonly LinterContributor[] = [
+  ignoredErrorsLinters,
+  arangoDbLinters,
+]
+
+function compareStrings(left: string, right: string): number {
+  if (left < right) return -1
+  if (left > right) return 1
+  return 0
 }
-
-const ruleContributors: readonly RuleContributor[] = [ignoredErrorsRules]
 
 export function deriveGolangciConfig(policy: Policy): GolangciConfigV2 {
   const enabledLinters = new Set<string>()
 
-  for (const contribute of ruleContributors) {
-    for (const rule of contribute(policy)) {
-      enabledLinters.add(rule.name)
+  for (const contribute of linterContributors) {
+    for (const linter of contribute(policy)) {
+      enabledLinters.add(linter)
     }
   }
+
+  const enable = [...enabledLinters].sort(compareStrings)
 
   return {
     version: '2',
     linters: {
       default: 'none',
-      enable: [...enabledLinters].sort(),
+      ...(enable.length > 0 ? { enable } : {}),
     },
   }
 }

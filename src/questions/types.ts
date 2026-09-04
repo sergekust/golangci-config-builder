@@ -1,24 +1,20 @@
-import type { Policy } from '../policy/types'
+import type { Policy, PolicyValue } from '../policy/types'
 
 export type QuestionOption<K extends keyof Policy> = {
-  value: Policy[K]
+  id: string
+  value: PolicyValue<K>
   label: string
   description: string
+  code?: string
   recommended?: boolean
 }
 
 export type QuestionDefinition<K extends keyof Policy> = {
   id: string
-  group: string
+  topic: string
   position: number
-  total: number
   policyKey: K
-  prompt: string
-  explanation: string
-  code: {
-    language: 'go'
-    filename: string
-    source: string
-  }
+  title: string
+  comment: string
   options: readonly QuestionOption<K>[]
 }

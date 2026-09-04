@@ -88,7 +88,7 @@
   max-inline-size: 20ch;
   margin: 0 0 clamp(20px, 2.8vh, 28px);
   color: var(--ink);
-  font-size: clamp(36px, 3.35vw, 52px);
+  font-size: clamp(32px, 3vw, 46px);
   font-weight: 620;
   line-height: 1.04;
   letter-spacing: -0.045em;
@@ -133,13 +133,11 @@
   tab-size: 4;
 }
 
-.code-line,
 .yaml-line {
   display: grid;
   grid-template-columns: 42px minmax(max-content, 1fr);
 }
 
-.code-line__number,
 .yaml-line__number {
   padding-inline-end: 12px;
   color: #8b9791;
@@ -148,6 +146,9 @@
 }
 
 .code-line__source {
+  display: block;
+  min-inline-size: max-content;
+  padding-inline-start: 18px;
   padding-inline-end: 20px;
   white-space: pre;
 }
@@ -369,6 +370,18 @@
   background: transparent;
 }
 
+.continue-button:disabled {
+  border-color: var(--line-strong);
+  color: var(--ink-soft);
+  background: var(--paper-muted);
+  opacity: 0.72;
+}
+
+.continue-button:disabled:hover {
+  color: var(--ink-soft);
+  background: var(--paper-muted);
+}
+
 .continue-button:focus-visible {
   outline: 2px solid var(--accent-dark);
   outline-offset: 3px;
@@ -386,6 +399,41 @@
 }
 
 .continue-button svg {
+  inline-size: 18px;
+  block-size: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.45;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--ink-soft);
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 620;
+}
+
+.back-button:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--paper-muted);
+}
+
+.back-button:focus-visible {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 3px;
+}
+
+.back-button svg {
   inline-size: 18px;
   block-size: 18px;
   fill: none;
@@ -456,6 +504,14 @@
   background: #1d292b;
 }
 
+.config-actions button:disabled,
+.config-actions button:disabled:hover {
+  border-color: transparent;
+  color: #687678;
+  background: transparent;
+  cursor: not-allowed;
+}
+
 .config-actions svg {
   inline-size: 14px;
   block-size: 14px;
@@ -495,8 +551,11 @@
   border-inline-start: 2px solid transparent;
 }
 
-.yaml-line--changed {
-  animation: config-line-change 540ms ease-out both;
+.yaml-line--added,
+.yaml-line--modified {
+  border-inline-start-color: #4bb6c8;
+  background: rgb(50 146 161 / 22%);
+  animation: config-line-change 180ms ease-out both;
 }
 
 .yaml-line__number {
@@ -522,13 +581,50 @@
 
 @keyframes config-line-change {
   0% {
-    border-inline-start-color: #4bb6c8;
-    background: rgb(50 146 161 / 22%);
+    background: rgb(50 146 161 / 5%);
   }
   100% {
-    border-inline-start-color: transparent;
-    background: transparent;
+    background: rgb(50 146 161 / 22%);
   }
+}
+
+.success-pane {
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+}
+
+.success-pane__inner {
+  inline-size: min(100%, 700px);
+  padding: clamp(32px, 6vw, 72px);
+}
+
+.success-pane__eyebrow {
+  margin: 0 0 20px;
+  color: var(--accent-dark);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.success-pane h1 {
+  max-inline-size: 13ch;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(42px, 5vw, 68px);
+  font-weight: 620;
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+}
+
+.success-pane__description {
+  max-inline-size: 48ch;
+  margin: 24px 0 30px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 .config-preview__footer {
@@ -549,6 +645,10 @@
   inline-size: 6px;
   block-size: 6px;
   background: #5bb2a2;
+}
+
+.generated-indicator--invalid {
+  background: #d18181;
 }
 
 @media (max-width: 899px) {
@@ -582,7 +682,7 @@
 
   .question-panel h1 {
     max-inline-size: 17ch;
-    font-size: clamp(36px, 7vw, 50px);
+    font-size: clamp(32px, 6.2vw, 44px);
   }
 
   .answer-panel__inner {
@@ -615,10 +715,9 @@
   }
 
   .question-panel h1 {
-    font-size: clamp(32px, 10.4vw, 42px);
+    font-size: clamp(28px, 9vw, 36px);
   }
 
-  .code-line,
   .yaml-line {
     grid-template-columns: 34px minmax(max-content, 1fr);
   }

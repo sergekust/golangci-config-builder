@@ -1,9 +1,13 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { PreviewYamlLine } from '../config/findChangedLines'
 
 type ConfigPreviewProps = {
   yaml: string
-  yamlRevision: number
-  changedLineNumbers: readonly number[]
+  lines: readonly PreviewYamlLine[]
+  changeRevision: number
+  targetVersion: string
+  validationErrors: readonly string[]
+  isValid: boolean
   status: string
   onReset: () => void
 }
@@ -58,18 +62,39 @@ function highlightYamlLine(line: string): ReactNode {
 
 export function ConfigPreview({
   yaml,
-  yamlRevision,
-  changedLineNumbers,
+  lines,
+  changeRevision,
+  targetVersion,
+  validationErrors,
+  isValid,
   status,
   onReset,
 }: ConfigPreviewProps) {
+  const bodyRef = useRef<HTMLDivElement>(null)
   const [copyResult, setCopyResult] = useState<{
     yaml: string
     status: 'copied' | 'failed'
   } | null>(null)
-  const lines = yaml.trimEnd().split('\n')
+
+  useEffect(() => {
+    const firstChange =
+      bodyRef.current?.querySelector<HTMLElement>('[data-yaml-change]')
+
+    if (!firstChange) return
+
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+    firstChange.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'nearest',
+      inline: 'nearest',
+    })
+  }, [changeRevision])
 
   const copyYaml = async () => {
+    if (!isValid) return
+
     try {
       await navigator.clipboard.writeText(yaml)
       setCopyResult({ yaml, status: 'copied' })
@@ -96,7 +121,7 @@ export function ConfigPreview({
       <header className="config-preview__header">
         <h2 id="config-title">.golangci.yml</h2>
         <div className="config-actions">
-          <button onClick={copyYaml} type="button">
+          <button disabled={!isValid} onClick={copyYaml} type="button">
             <CopyIcon />
             <span>{copyLabel}</span>
           </button>
@@ -107,22 +132,21 @@ export function ConfigPreview({
         </div>
       </header>
 
-      <div className="config-preview__body">
+      <div className="config-preview__body" ref={bodyRef}>
         <pre aria-label="Generated golangci-lint configuration" tabIndex={0}>
           <code>
-            {lines.map((line, index) => {
-              const isPolicyLine = changedLineNumbers.includes(index + 1)
-
+            {lines.map((line) => {
               return (
                 <span
-                  className={`yaml-line ${isPolicyLine ? 'yaml-line--changed' : ''}`}
-                  key={`${yamlRevision}-${index}-${line}`}
+                  className={`yaml-line ${line.change ? `yaml-line--${line.change}` : ''}`}
+                  data-yaml-change={line.change || undefined}
+                  key={`${changeRevision}-${line.id}-${line.change ?? 'stable'}`}
                 >
                   <span className="yaml-line__number" aria-hidden="true">
-                    {index + 1}
+                    {line.lineNumber}
                   </span>
                   <span className="yaml-line__source">
-                    {highlightYamlLine(line)}
+                    {highlightYamlLine(line.text)}
                   </span>
                 </span>
               )
@@ -132,8 +156,14 @@ export function ConfigPreview({
       </div>
 
       <footer className="config-preview__footer">
-        <span className="generated-indicator" aria-hidden="true" />
-        <span>{status}</span>
+        <span
+          className={`generated-indicator ${isValid ? '' : 'generated-indicator--invalid'}`}
+          aria-hidden="true"
+        />
+        <span title={validationErrors.join('\n') || undefined}>
+          {isValid ? 'Valid' : 'Invalid'} for golangci-lint {targetVersion} ·{' '}
+          {status}
+        </span>
       </footer>
       <p className="sr-only" role="status" aria-atomic="true" aria-live="polite">
         {copyAnnouncement}

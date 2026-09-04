@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
 
 type CodeSampleProps = {
-  filename: string
-  language: string
   source: string
 }
 
@@ -93,22 +91,19 @@ function highlightGoLine(line: string): ReactNode[] {
   return tokens
 }
 
-export function CodeSample({ filename, language, source }: CodeSampleProps) {
+export function CodeSample({ source }: CodeSampleProps) {
   const lines = source.split('\n')
 
   return (
     <figure className="code-sample">
       <figcaption className="code-sample__caption">
-        <span>{filename}</span>
-        <span>{language}</span>
+        <span>Example</span>
+        <span>Go</span>
       </figcaption>
-      <pre aria-label={`${language} example from ${filename}`} tabIndex={0}>
+      <pre aria-label="Go code example" tabIndex={0}>
         <code>
           {lines.map((line, index) => (
             <span className="code-line" key={`${index}-${line}`}>
-              <span className="code-line__number" aria-hidden="true">
-                {index + 1}
-              </span>
               <span className="code-line__source">
                 {highlightGoLine(line)}
               </span>
